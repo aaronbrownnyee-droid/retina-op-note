@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Retina Operative Note Builder</title>
+<!--
+  Retina Operative Note Builder — beta
+  Author: Aaron Brown, MD
+  Runs entirely in the browser. No patient data is stored, logged, or transmitted.
+-->
+<style>
+:root{
+  --console:#14232A;
+  --console-2:#1B2F37;
+  --console-3:#24414B;
+  --line:rgba(255,255,255,.11);
+  --line-strong:rgba(255,255,255,.22);
+  --stain:#2E86BE;
+  --stain-lt:#7CBCE2;
+  --amber:#C98A32;
+  --amber-lt:#F0D9AE;
+  --paper:#F1F4F3;
+  --paper-2:#E1E8E6;
+  --ink:#12212A;
+  --ink-soft:#465A62;
+  --muted:#8DA3AB;
+  --ui:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --doc:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--ui);background:var(--console);color:#E8F0F2;-webkit-font-smoothing:antialiased}
+.shell{display:grid;grid-template-columns:minmax(340px,410px) 1fr;min-height:100vh}
+
+/* ---------- console ---------- */
+.console{background:var(--console);border-right:1px solid var(--line);padding:0 0 70px;overflow-y:auto;max-height:100vh}
+.masthead{padding:26px 26px 20px;border-bottom:1px solid var(--line)}
+.masthead h1{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em;color:#fff}
+.masthead p{margin:7px 0 0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.nophi{margin-top:14px;display:flex;gap:9px;align-items:flex-start;font-size:11.5px;line-height:1.45;
+  color:var(--amber-lt);background:rgba(201,138,50,.10);border:1px solid rgba(201,138,50,.28);
+  border-radius:5px;padding:9px 11px}
+.grp{border-bottom:1px solid var(--line);padding:20px 26px}
+.grp:last-child{border-bottom:none}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--stain-lt);margin:0 0 14px;display:flex;align-items:baseline;gap:9px}
+.eyebrow .n{font-family:var(--mono);color:var(--muted);font-weight:500;letter-spacing:0}
+
+.cases{display:flex;flex-direction:column;gap:5px}
+.case{text-align:left;border:1px solid var(--line);background:transparent;color:#DCE7EA;
+  padding:10px 13px;border-radius:5px;font:inherit;font-size:13.5px;cursor:pointer;line-height:1.3;
+  transition:background .13s,border-color .13s}
+.case:hover{background:var(--console-2);border-color:var(--line-strong)}
+.case.on{background:var(--stain);border-color:var(--stain);color:#fff;font-weight:500}
+.case .cpt{display:block;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:3px}
+.case.on .cpt{color:rgba(255,255,255,.78)}
+
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field.wide{grid-column:1/-1}
+label.lbl{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+select,input[type=text],input[type=date]{background:var(--console-2);border:1px solid var(--line);color:#EAF2F4;
+  border-radius:5px;padding:8px 9px;font:inherit;font-size:13px;width:100%}
+input[type=date]{color-scheme:dark}
+select:focus,input:focus{outline:2px solid var(--stain);outline-offset:1px;border-color:transparent}
+
+.stage{margin-bottom:20px}
+.stage:last-child{margin-bottom:0}
+.stage h3{margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#93AEB7}
+.mod{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:5px;cursor:pointer}
+.mod:hover{background:var(--console-2)}
+.mod input{margin:1px 0 0;accent-color:var(--stain);width:15px;height:15px;flex:none;cursor:pointer}
+.mod span{font-size:13.5px;line-height:1.35;color:#D5E2E6}
+.mod.locked{cursor:default;opacity:.6}
+.mod.locked:hover{background:transparent}
+.mod.locked span::after{content:" · always included";font-size:11px;color:var(--muted)}
+.subopt{margin:2px 0 8px 35px;display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:transparent;color:#C6D6DA;border-radius:20px;
+  padding:5px 11px;font:inherit;font-size:12px;cursor:pointer}
+.chip:hover{border-color:var(--line-strong)}
+.chip.on{background:var(--console-3);border-color:var(--stain-lt);color:#fff}
+.subnum{margin:2px 0 8px 35px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.subnum input{width:78px;padding:5px 7px;font-size:12px}
+
+/* ---------- paper ---------- */
+.paper{background:var(--paper);color:var(--ink);overflow-y:auto;max-height:100vh}
+.paperbar{position:sticky;top:0;z-index:5;background:rgba(241,244,243,.94);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--paper-2);padding:13px 46px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.paperbar .status{font-size:12.5px;color:var(--ink-soft);flex:1;min-width:160px}
+.paperbar .status b{color:#96631A;font-weight:600}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:5px;
+  padding:8px 15px;font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.btn:hover{background:#22394A}
+.btn.ghost{background:transparent;color:var(--ink);border-color:#B9C6C4}
+.btn.ghost:hover{background:var(--paper-2)}
+.doc{padding:32px 46px 110px;max-width:830px}
+.doctitle{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);
+  margin:0 0 20px;padding-bottom:11px;border-bottom:2px solid var(--ink)}
+.hdr{display:grid;grid-template-columns:180px 1fr;gap:0 20px;margin:0 0 28px}
+.hdr dt{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+  padding:8px 0;border-top:1px solid var(--paper-2)}
+.hdr dd{margin:0;font-family:var(--doc);font-size:15px;line-height:1.5;padding:7px 0;border-top:1px solid var(--paper-2)}
+.hdr dt.first,.hdr dd.first{border-top:none}
+.cptline{font-family:var(--mono);font-size:12.5px;color:#1F6DA0;font-weight:600;margin-top:4px}
+.cptnote{font-family:var(--ui);font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:4px}
+.cptnote s{color:#93A3A1}
+.body{font-family:var(--doc);font-size:15.5px;line-height:1.72}
+.body p{margin:0 0 15px}
+.sechead{font-family:var(--ui);font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-soft);margin:26px 0 11px}
+span.fill{
+  background:#FAEBCF;border-bottom:1.5px solid var(--amber);border-radius:2px;
+  padding:0 3px;cursor:text;outline:none;color:#6E4A0F;
+}
+span.fill:empty::before{content:attr(data-ph);font-style:italic;color:#9A7331}
+span.fill{scroll-margin-top:96px;scroll-margin-bottom:56px}
+span.fill.sug{background:#DEEDF7;border-bottom-color:var(--stain)}
+span.fill.sug:empty::before{color:#3C6E92}
+span.fill.sug:focus{background:#EDF6FC;box-shadow:0 0 0 2px rgba(46,134,190,.4)}
+span.fill:focus{background:#FDF6E7;box-shadow:0 0 0 2px rgba(201,138,50,.45)}
+span.fill.done{background:transparent;border-bottom-color:transparent;color:inherit;padding:0}
+span.fill.done:hover{border-bottom-color:#C3CFCD}
+span.fill.done:focus{background:#FDF6E7;box-shadow:0 0 0 2px rgba(46,134,190,.35);padding:0 3px}
+.footnote{margin-top:42px;padding-top:15px;border-top:1px solid var(--paper-2);
+  font-family:var(--ui);font-size:11.5px;line-height:1.55;color:var(--ink-soft);max-width:660px}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--ink);
+  color:var(--paper);padding:11px 20px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;
+  transition:opacity .2s,transform .2s;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .console{max-height:none;border-right:none;border-bottom:1px solid var(--line);padding-bottom:22px}
+  .paper{max-height:none}
+  .paperbar{padding:12px 20px}
+  .doc{padding:22px 20px 70px}
+  .hdr{grid-template-columns:1fr}
+  .hdr dt{padding:10px 0 0}
+  .hdr dd{padding:1px 0 8px;border-top:none}
+  .hdr dd.first{border-top:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="console">
+  <div class="masthead">
+    <h1>Retina Operative Note Builder</h1>
+    <p>Pick the case, toggle the steps you did. The note assembles in surgical order on the right.</p>
+    <div class="nophi">
+      <span>◆</span>
+      <span>No patient identifiers. Nothing typed here is saved or sent anywhere — closing the page clears it.</span>
+    </div>
+  </div>
+
+  <section class="grp">
+    <p class="eyebrow"><span class="n">01</span> Case</p>
+    <div class="cases" id="cases"></div>
+  </section>
+
+  <section class="grp" id="sec-details">
+    <p class="eyebrow"><span class="n">02</span> Details</p>
+    <div class="fields" id="fields"></div>
+  </section>
+
+  <section class="grp">
+    <p class="eyebrow"><span class="n">03</span> Steps performed</p>
+    <div id="stages"></div>
+  </section>
+
+  <section class="grp">
+    <p class="eyebrow"><span class="n">04</span> Complications</p>
+    <div class="subopt" style="margin-left:0" id="complchips"></div>
+    <div id="complnote"></div>
+  </section>
+</aside>
+
+<main class="paper">
+  <div class="paperbar">
+    <div class="status" id="status"></div>
+    <button class="btn ghost" id="resetBtn">Reset</button>
+    <button class="btn" id="copyBtn">Copy note</button>
+  </div>
+  <div class="doc">
+    <p class="doctitle">Operative Report</p>
+    <dl class="hdr" id="hdr"></dl>
+    <div class="body" id="body"></div>
+    <p class="footnote" id="foot"></p>
+  </div>
+</main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+const S = {
+  caseId:"macular",
+  vars:{ date:"", eye:"right", lens:"pseudophakic", gauge:"25", anes:"retrobulbar", view:"wide-angle", surgeon:"", assistant:"" },
+  mods:{}, opts:{}, nums:{}, fills:{}, compl:"none", caseOpen:true
+};
+
+const mmPost = () => S.vars.lens === "phakic" ? "4" : "3.5";
+const EYE = () => S.vars.eye === "right" ? "right" : "left";
+const OU  = () => S.vars.eye === "right" ? "OD" : "OS";
+const F = (key, ph) => `{{${key}|${ph}}}`;
+const D = (key, suggestion) => `{{${key}|${suggestion}|d}}`;
+
+/* ===================== MODULES ===================== */
+const M = [
+
+{ id:"timeout", stage:"Opening", order:10, para:1, locked:true, label:"Time-out and positioning",
+  text:()=>`The patient was identified in the pre-operative area and the operative eye was confirmed and marked. The patient was brought to the operating room and placed supine on the operating table. A surgical time-out was performed, during which the patient's identity, the operative eye, and the planned procedure were confirmed by all members of the surgical team.` },
+
+{ id:"anes", stage:"Opening", order:20, para:1, locked:true, label:"Anesthesia",
+  text:()=>({
+    retrobulbar:`A retrobulbar block consisting of a 1:1 mixture of 2% lidocaine and 0.75% bupivacaine was administered without difficulty, followed by gentle digital massage. Monitored anesthesia care was provided throughout by the anesthesia team.`,
+    peribulbar:`A peribulbar block consisting of a 1:1 mixture of 2% lidocaine and 0.75% bupivacaine was administered without difficulty. Monitored anesthesia care was provided throughout by the anesthesia team.`,
+    general:`General anesthesia was induced by the anesthesia team and the airway was secured without difficulty.`,
+    topical:`Topical anesthesia was achieved with proparacaine and 2% lidocaine gel, supplemented with preservative-free intracameral lidocaine.`
+  })[S.vars.anes] },
+
+{ id:"prep", stage:"Opening", order:30, para:1, locked:true, label:"Prep and drape",
+  text:()=>`The ${EYE()} eye was prepped with 5% povidone-iodine applied to the periocular skin and lashes and instilled into the conjunctival fornices. The patient was draped in standard sterile ophthalmic fashion with isolation of the lashes, and a lid speculum was placed.` },
+
+{ id:"peritomy", stage:"Access", order:100, para:2, label:"Conjunctival peritomy",
+  opts:{ label:"Extent", choices:{ "360":"360 degrees", "2q":"Involved quadrants" } },
+  text:()=> S.opts.peritomy === "2q"
+    ? `A conjunctival peritomy was performed at the limbus over the ${F("perquad","quadrants")} quadrants, and Tenon's capsule was bluntly dissected from the underlying sclera.`
+    : `A 360-degree conjunctival peritomy was performed at the limbus with radial relaxing incisions, and Tenon's capsule was bluntly dissected from the underlying sclera in all four quadrants.` },
+
+{ id:"slings", stage:"Access", order:110, para:2, label:"Rectus muscle isolation",
+  text:()=>`The four rectus muscles were isolated on 2-0 silk traction sutures.` },
+
+{ id:"buckle", stage:"Access", order:120, para:2, label:"Scleral buckle placement",
+  opts:{ label:"Element", choices:{ band:"#41 encircling band", sponge:"#287 sponge", seg:"#276 segmental" } },
+  text:()=>{
+    const k = S.opts.buckle || "band";
+    const el = { band:"A #41 solid silicone encircling band", sponge:"A #287 silicone sponge", seg:"A #276 segmental silicone element" }[k];
+    const tail = k === "band"
+      ? ` The ends of the band were joined with a #270 silicone sleeve in the ${F("sleevequad","quadrant")} quadrant and tightened until adequate indentation was confirmed by indirect ophthalmoscopy.`
+      : ` Adequate indentation supporting the involved break(s) was confirmed by indirect ophthalmoscopy.`;
+    return `${el} was passed beneath the rectus muscles and secured to the sclera with 5-0 Mersilene mattress sutures in each involved quadrant, positioned to support the retinal break(s).` + tail;
+  } },
+
+{ id:"trocars", stage:"Access", order:140, para:2, locked:true, label:"Trocar cannula placement",
+  text:()=>`Three ${S.vars.gauge}-gauge valved trocar cannulas were placed through beveled scleral entries ${mmPost()} mm posterior to the surgical limbus in the inferotemporal, superotemporal, and superonasal quadrants. The infusion line was secured in the inferotemporal cannula, and the cannula tip was directly visualized within the vitreous cavity before the infusion was opened.` },
+
+{ id:"chandelier", stage:"Access", order:150, para:2, label:"Chandelier for bimanual work",
+  text:()=>`A chandelier light source was placed ${mmPost()} mm posterior to the limbus in the ${F("chandquad","quadrant")} quadrant to permit bimanual dissection.` },
+
+{ id:"core", stage:"Vitrectomy", order:200, para:3, locked:true, label:"Viewing system in position",
+  text:()=>({
+    "wide-angle":`A wide-angle non-contact viewing system was brought into position.`,
+    "contact":`A planoconcave contact lens viewing system was brought into position.`,
+    "both":`A wide-angle non-contact viewing system was brought into position, with a planoconcave contact lens used for magnified visualization of the posterior pole.`
+  })[S.vars.view] },
+
+{ id:"findings", stage:"Vitrectomy", order:()=>CASES[S.caseId].noVit ? 90 : 202, para:()=>CASES[S.caseId].noVit ? 2 : 3,
+  locked:true, label:"Examination findings", text:()=>FINDINGS() },
+
+{ id:"corevit", stage:"Vitrectomy", order:208, para:3, locked:true, label:"Core vitrectomy",
+  opts:{ label:"Technique", choices:{ standard:"Standard", ap:"Anterior to posterior" } },
+  text:()=> S.opts.corevit === "ap"
+    ? `A core vitrectomy was performed in an anterior-to-posterior fashion.`
+    : `A core vitrectomy was performed.` },
+
+{ id:"tap", stage:"Vitrectomy", order:205, para:3, label:"Vitreous tap for culture",
+  text:()=>`A vitreous tap was performed through the pars plana ${mmPost()} mm posterior to the limbus using a 23-gauge needle on a tuberculin syringe, and ${D("tapvol","0.2 mL")} of vitreous was aspirated and submitted immediately for Gram stain, culture, and sensitivities.` },
+
+{ id:"vitbiopsy", stage:"Vitrectomy", order:206, para:3, label:"Diagnostic vitreous biopsy",
+  text:()=>`With the infusion closed, an undiluted vitreous specimen of approximately ${D("biopvol","1.0 mL")} was obtained with the vitrectomy probe on manual aspiration and handed off immediately for ${F("biopsend","cytology / flow cytometry / culture")}. The infusion was then opened and a diluted specimen was collected from the cassette.` },
+
+{ id:"ta", stage:"Vitrectomy", order:210, para:3, label:"Triamcinolone to visualize hyaloid",
+  text:()=>`Preservative-free triamcinolone acetonide was injected into the vitreous cavity to stain the posterior hyaloid, and the excess was aspirated.` },
+
+{ id:"pvd", stage:"Vitrectomy", order:220, para:3, label:"Posterior vitreous detachment",
+  opts:{ label:"Status", choices:{ induced:"Induced", present:"Already present" } },
+  text:()=> S.opts.pvd === "present"
+    ? `A posterior vitreous detachment was noted to be already present, confirmed by an elevated Weiss ring over the posterior pole.`
+    : `A posterior vitreous detachment was induced using active suction with the vitrectomy probe at the optic nerve head, and its completion was confirmed by an elevated Weiss ring extending anteriorly over the posterior pole.` },
+
+{ id:"trim", stage:"Vitrectomy", order:230, para:3, label:"Trim hyaloid to the vitreous base",
+  text:()=>`The posterior hyaloid was trimmed anteriorly to the vitreous base.` },
+
+{ id:"shave", stage:"Vitrectomy", order:240, para:3, label:"360° vitreous base shave",
+  opts:{ label:"Breaks", choices:{ nobreaks:"No breaks identified", breaks:"Attention to identified breaks" } },
+  text:()=>{
+    const dep = S.vars.assistant ? "With scleral depression provided by the assistant" : "With scleral depression";
+    return S.opts.shave === "breaks"
+      ? `${dep}, the vitreous base was shaved for 360 degrees, with particular attention to the region of the identified break(s).`
+      : `${dep}, the vitreous base was shaved for 360 degrees.`;
+  } },
+
+{ id:"trimbreak", stage:"Vitrectomy", order:255, para:3, label:"Relieve traction at breaks / amputate flap",
+  opts:{ label:"Flap", choices:{ amputate:"Flap amputated", noflap:"Traction relieved only" } },
+  text:()=> S.opts.trimbreak === "noflap"
+    ? `The vitreous surrounding each retinal break was trimmed with the vitrectomy probe until all traction on the break margins had been relieved.`
+    : `The vitreous surrounding each retinal break was trimmed with the vitrectomy probe until all traction on the break margins had been relieved, and the flap of each break was amputated flush with the retinal surface.` },
+
+{ id:"periph", stage:"Vitrectomy", order:250, para:3, label:"360° depressed peripheral exam",
+  text:()=>`A careful 360-degree examination with scleral depression was then performed. ${F("breakdesc","describe the findings: number, type, and clock hours of any breaks")}` },
+
+{ id:"lensectomy", stage:"Anterior segment", order:180, para:3, label:"Pars plana lensectomy",
+  text:()=>`A pars plana lensectomy was performed, with removal of the lens using the fragmatome and the vitrectomy probe. The capsule was ${F("capsulefate","left intact / removed")}.` },
+
+{ id:"antvit", stage:"Anterior segment", order:190, para:3, label:"Anterior vitrectomy",
+  text:()=>`An anterior vitrectomy was performed to clear vitreous from the anterior chamber and the pupillary plane, confirmed with triamcinolone staining and by a round, centered pupil at the conclusion.` },
+
+{ id:"stain", stage:"Macula", order:300, para:4, label:"Macular dye",
+  opts:{ label:"Agent", choices:{ bbg:"Brilliant Blue G", icg:"ICG", ta:"Triamcinolone" } },
+  text:()=>({
+    bbg:`Brilliant Blue G was instilled over the posterior pole, allowed to dwell briefly, and then aspirated, yielding good staining of the internal limiting membrane.`,
+    icg:`Indocyanine green was instilled over the posterior pole, allowed to dwell briefly, and then thoroughly aspirated, yielding good staining of the internal limiting membrane.`,
+    ta:`Preservative-free triamcinolone acetonide was instilled over the posterior pole to highlight residual cortical vitreous and membrane, and the excess was aspirated.`
+  })[S.opts.stain || "bbg"] },
+
+{ id:"erm", stage:"Macula", order:310, para:4, label:"Epiretinal membrane peel",
+  text:()=>`An edge of the epiretinal membrane was elevated ${F("ermedge","location, e.g. temporal to the fovea")} using intraocular forceps, and the membrane was peeled centripetally toward the fovea and removed in ${F("ermpieces","one piece / several pieces")}.` },
+
+{ id:"ilm", stage:"Macula", order:320, para:4, label:"ILM peel",
+  nums:{ label:"Radius (disc diameters)", def:"2" },
+  text:()=>`The internal limiting membrane was engaged with intraocular forceps and peeled circumferentially in rhexis fashion to approximately ${S.nums.ilm || "2"} disc diameters around the fovea. Complete removal within this area was confirmed by inspection of the peeled edge and by the absence of residual stained tissue.` },
+
+{ id:"mhflap", stage:"Macula", order:330, para:4, label:"Inverted ILM flap for macular hole",
+  text:()=>`Rather than excising the internal limiting membrane entirely, a flap was left hinged at the margin of the macular hole, inverted, and laid over the hole.` },
+
+{ id:"subtpa", stage:"Macula", order:340, para:4, label:"Subretinal tPA for submacular blood",
+  text:()=>`Using a 41-gauge subretinal cannula, ${F("tpadose","dose")} of tissue plasminogen activator was injected into the subretinal space, creating a bleb that involved the submacular hemorrhage.` },
+
+{ id:"segdel", stage:"Retina", order:400, para:5, label:"Segmentation and delamination of membranes",
+  text:()=>{
+    const tech = S.mods.chandelier
+      ? `using bimanual technique with intraocular forceps and vertical scissors`
+      : `using intraocular forceps and vertical scissors`;
+    return `Fibrovascular membranes were segmented and delaminated from the retinal surface ${tech}, working from areas of existing separation toward the firmly adherent points. Bleeding vessels were treated with intraocular diathermy and with transient elevation of the infusion pressure until hemostasis was achieved.`;
+  } },
+
+{ id:"pneumatic", stage:"Retina", order:465, para:5, label:"Pneumatic gas injection",
+  opts:{ label:"Gas", choices:{ sf6:"0.5 mL 100% SF6", c3f8:"0.3 mL 100% C3F8" } },
+  text:()=>{
+    const g = S.opts.pneumatic === "c3f8" ? "0.3 mL of 100% perfluoropropane" : "0.5 mL of 100% sulfur hexafluoride";
+    return `An anterior chamber paracentesis was performed with a 30-gauge needle to soften the globe. ${g} was then injected through the pars plana ${mmPost()} mm posterior to the limbus in the ${F("gasquad","quadrant")} quadrant, delivered as a single bubble under indirect ophthalmoscopic visualization. Central retinal artery perfusion was confirmed and the intraocular pressure was assessed digitally and judged to be physiologic.`;
+  } },
+
+{ id:"retinectomy", stage:"Retina", order:410, para:5, label:"Relaxing retinotomy / retinectomy",
+  text:()=>`Because residual traction prevented retinal reattachment, diathermy was applied along the intended margin and a relaxing retinectomy was created over ${F("retinoextent","extent, e.g. 90 degrees inferiorly")}. The anterior flap was excised with the vitrectomy probe.` },
+
+{ id:"drainretinotomy", stage:"Retina", order:420, para:5, label:"Drainage retinotomy",
+  text:()=>`A drainage retinotomy was created with diathermy in the ${F("drquad","quadrant")} quadrant to permit egress of subretinal fluid.` },
+
+{ id:"pfo", stage:"Retina", order:430, para:5, label:"Perfluoro-n-octane",
+  text:()=>`Perfluoro-n-octane was injected over the posterior pole to flatten the retina and displace subretinal fluid anteriorly toward the peripheral break(s).` },
+
+{ id:"fragments", stage:"Anterior segment", order:435, para:5, label:"Removal of retained lens fragments",
+  text:()=>`Perfluoro-n-octane was placed over the posterior pole to protect the macula. The retained lens fragments were elevated into the mid-vitreous cavity and emulsified with the fragmatome using short bursts of ultrasound with the tip directed away from the retina, until no residual fragments were identified on careful inspection of the posterior pole and the periphery.` },
+
+{ id:"fax", stage:"Retina", order:440, para:5, label:"Fluid–air exchange with drainage of SRF",
+  text:()=>`A complete fluid-air exchange was performed, with residual subretinal fluid drained through the ${F("drainsite","break / drainage retinotomy")} using a soft-tipped extrusion cannula under direct visualization until the retina lay flat.` },
+
+{ id:"extdrain", stage:"Retina", order:445, para:5, label:"External drainage of subretinal fluid",
+  text:()=>`External drainage of subretinal fluid was performed in the ${F("extdrquad","quadrant")} quadrant through a radial scleral cutdown with choroidal perforation, with egress of ${F("srfchar","clear / turbid")} subretinal fluid and no evidence of hemorrhage or retinal incarceration.` },
+
+{ id:"endolaser", stage:"Retina", order:450, para:5, label:"Endolaser",
+  opts:{ label:"Pattern", choices:{ focal:"Around breaks", ring360:"360° peripheral", prp:"Panretinal" } },
+  nums:{ label:"Spots (panretinal only)", def:"1500" },
+  text:()=>{
+    const base = {
+      focal:`Endolaser photocoagulation was applied in three confluent rows surrounding each identified retinal break.`,
+      ring360:`Endolaser photocoagulation was applied as a confluent 360-degree band to the peripheral retina anterior to the equator, with additional confluent treatment surrounding each identified break.`,
+      prp:`Panretinal endolaser photocoagulation was applied from the vascular arcades to the vitreous base for 360 degrees, with approximately ${S.nums.endolaser || "1500"} spots placed.`
+    }[S.opts.endolaser || "focal"];
+    const r = S.mods.retinectomy, d = S.mods.drainretinotomy;
+    if (!r && !d) return base;
+    const site = r && d ? `the entire margin of the retinectomy and around the drainage retinotomy`
+               : r      ? `the entire margin of the retinectomy`
+               :          `the drainage retinotomy`;
+    return `${base} Confluent endolaser was additionally applied along ${site}.`;
+  } },
+
+{ id:"cryo", stage:"Retina", order:460, para:5, label:"Cryopexy",
+  text:()=>`Transconjunctival cryopexy was applied to each retinal break under indirect ophthalmoscopic visualization, with a single application per break terminated at the first appearance of retinal whitening.` },
+
+{ id:"acwash", stage:"Anterior segment", order:470, para:5, label:"Anterior chamber washout",
+  text:()=>`The anterior chamber was irrigated and aspirated to remove ${F("acdebris","blood / lens material / fibrin")}.` },
+
+{ id:"pfoout", stage:"Tamponade", order:490, para:6, label:"Perfluoron removal (direct exchange)",
+  text:()=>`The perfluoro-n-octane was removed by direct exchange under continuous visualization, with the extrusion cannula held at the perfluorocarbon meniscus until no residual bubbles were identified.` },
+
+{ id:"oilremoval", stage:"Tamponade", order:495, para:6, label:"Silicone oil removal",
+  text:()=>`The silicone oil was passively extracted from the vitreous cavity through a widened superior sclerotomy under active infusion, followed by repeated fluid-air-fluid exchanges until no residual oil droplets were identified within the vitreous cavity or the anterior chamber.` },
+
+{ id:"pi", stage:"Tamponade", order:498, para:6, label:"Inferior peripheral iridectomy",
+  text:()=>`An inferior peripheral iridectomy was created with the vitrectomy probe to prevent pupillary block.` },
+
+{ id:"tamponade", stage:"Tamponade", order:500, para:6, locked:true, label:"Tamponade",
+  opts:{ label:"Agent", choices:{ bss:"Fluid (BSS)", air:"Air", sf6:"20% SF6", c3f8:"14% C3F8", oil1000:"Oil 1000 cSt", oil5000:"Oil 5000 cSt" } },
+  text:()=>{
+    const k = S.opts.tamponade || "bss";
+    if (k === "bss")  return `The eye was left fluid-filled with balanced salt solution; no gas or oil tamponade was placed.`;
+    if (k === "air")  return `A complete fluid-air exchange was performed and the eye was left with an air fill.`;
+    if (k === "sf6")  return `A complete fluid-air exchange was performed, and a non-expansile 20% mixture of sulfur hexafluoride was flushed through the vitreous cavity to a complete fill.`;
+    if (k === "c3f8") return `A complete fluid-air exchange was performed, and a non-expansile 14% mixture of perfluoropropane was flushed through the vitreous cavity to a complete fill.`;
+    const cst = k === "oil1000" ? "1000" : "5000";
+    return `Under air, silicone oil (${cst} centistoke) was infused into the vitreous cavity through the superior cannula while air vented passively, continuing until a complete fill was achieved and the intraocular pressure was judged to be physiologic.`;
+  } },
+
+{ id:"iviinject", stage:"Closure", order:590, para:7, label:"Intravitreal injection at close",
+  opts:{ label:"Agent", choices:{ bev:"Bevacizumab", tri:"Triamcinolone", abx:"Antibiotics" } },
+  text:()=>({
+    bev:`Bevacizumab 1.25 mg in 0.05 mL was injected into the vitreous cavity through the pars plana.`,
+    tri:`Preservative-free triamcinolone acetonide ${F("tridose","dose")} was injected into the vitreous cavity through the pars plana.`,
+    abx:`Intravitreal vancomycin 1 mg in 0.1 mL and ceftazidime 2.25 mg in 0.1 mL were injected through the pars plana using separate syringes.`
+  })[S.opts.iviinject || "bev"] },
+
+{ id:"closecannula", stage:"Closure", order:600, para:7, locked:true, label:"Sclerotomy closure",
+  opts:{ label:"Closure", choices:{ selfseal:"Self-sealing", vicryl:"Sutured — Vicryl", gut:"Sutured — plain gut" } },
+  text:()=>{
+    const k = S.opts.closecannula || "selfseal";
+    if (k === "selfseal")
+      return `The cannulas were removed sequentially with simultaneous tamponade of each sclerotomy using a cotton-tipped applicator. Each site was inspected and found to be self-sealing.`;
+    const mat = k === "gut" ? "plain gut" : "Vicryl";
+    return `The cannulas were removed and all three sclerotomies were closed with interrupted ${D("sutsize","7-0")} ${mat} sutures.`;
+  } },
+
+{ id:"iop", stage:"Closure", order:615, para:7, locked:true, label:"Intraocular pressure check",
+  text:()=>`The intraocular pressure was assessed digitally and judged to be physiologic.` },
+
+{ id:"closeconj", stage:"Closure", order:620, para:7, label:"Close conjunctiva",
+  text:()=>`The conjunctiva and Tenon's capsule were reapproximated at the limbus with interrupted 7-0 Vicryl sutures.` },
+
+{ id:"subconj", stage:"Closure", order:630, para:7, label:"Subconjunctival injections",
+  text:()=>`Subconjunctival injections of ${D("subconjdrugs","cefazolin and dexamethasone")} were administered in the inferior fornix, away from the sclerotomy sites.` },
+
+{ id:"finish", stage:"Closure", order:700, para:7, locked:true, label:"Dressing and disposition",
+  text:()=>`The speculum and drapes were removed, topical antibiotic ointment was applied, and the eye was patched and shielded. The patient tolerated the procedure well and was transferred to the recovery area in stable condition.` },
+
+{ id:"positioning", stage:"Closure", order:710, para:7, label:"Positioning instructions",
+  opts:{ label:"Position", choices:{ face:"Face-down", side:"Side", upright:"Upright", none:"None required" } },
+  text:()=>({
+    face:`The patient was instructed to maintain face-down positioning until follow-up.`,
+    side:`The patient was instructed to maintain ${F("posside","right / left")} side positioning until follow-up in order to tamponade the treated break.`,
+    upright:`The patient was instructed to maintain upright positioning and to avoid a supine posture until follow-up.`,
+    none:`No specific head positioning was required.`
+  })[S.opts.positioning || "face"] }
+];
+
+/* ===================== CASES ===================== */
+const CASES = {
+  macular:{ label:"Macular surgery — ERM / macular hole", hint:"67041 · 67042",
+    preDx:()=>`${F("predx","epiretinal membrane")}, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Pars plana vitrectomy with membrane peeling`,
+    allow:["chandelier","ta","pvd","trim","shave","periph","stain","erm","ilm","mhflap","subtpa","antvit","acwash","pfoout","tamponade","iviinject","subconj","positioning"],
+    on:["ta","pvd","trim","stain","erm","ilm"],
+    defOpts:{ tamponade:"bss", stain:"bbg", pvd:"induced" , shave:"nobreaks"} },
+
+  rrd:{ label:"Retinal detachment — PPV", hint:"67108",
+    preDx:()=>`Rhegmatogenous retinal detachment, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Repair of retinal detachment with pars plana vitrectomy`,
+    allow:["peritomy","slings","buckle","chandelier","ta","pvd","trim","shave","periph","trimbreak","lensectomy","pfo","drainretinotomy","retinectomy","fax","endolaser","cryo","stain","ilm","pfoout","pi","tamponade","subconj","positioning"],
+    on:["ta","pvd","trim","shave","periph","trimbreak","pfo","fax","endolaser"],
+    defOpts:{ tamponade:"sf6", endolaser:"focal", positioning:"face", pvd:"induced" , shave:"breaks", trimbreak:"amputate"} },
+
+  ppvsb:{ label:"Retinal detachment — PPV + buckle", hint:"67108",
+    preDx:()=>`Rhegmatogenous retinal detachment, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Repair of retinal detachment with pars plana vitrectomy and scleral buckling`,
+    allow:["peritomy","slings","buckle","chandelier","ta","pvd","trim","shave","periph","trimbreak","lensectomy","pfo","drainretinotomy","retinectomy","fax","endolaser","cryo","pfoout","pi","tamponade","closeconj","subconj","positioning"],
+    on:["peritomy","slings","buckle","ta","pvd","trim","shave","periph","trimbreak","pfo","fax","endolaser","closeconj"],
+    defOpts:{ tamponade:"sf6", endolaser:"ring360", peritomy:"360", buckle:"band", positioning:"face", pvd:"induced" , shave:"breaks", trimbreak:"amputate"} },
+
+  sb:{ label:"Retinal detachment — buckle alone", hint:"67107", noVit:true,
+    preDx:()=>`Rhegmatogenous retinal detachment, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Repair of retinal detachment with scleral buckling`,
+    allow:["peritomy","slings","buckle","cryo","extdrain","closeconj","subconj","positioning"],
+    on:["peritomy","slings","buckle","cryo","extdrain","closeconj"],
+    defOpts:{ peritomy:"360", buckle:"band", positioning:"side" } },
+
+  pneumatic:{ label:"Retinal detachment — pneumatic retinopexy", hint:"67110", noVit:true,
+    preDx:()=>`Rhegmatogenous retinal detachment, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Repair of retinal detachment by pneumatic retinopexy`,
+    allow:["cryo","pneumatic","positioning"], on:["cryo","pneumatic"],
+    defOpts:{ pneumatic:"sf6", positioning:"side" } },
+
+  trd:{ label:"Tractional detachment / PDR", hint:"67113",
+    preDx:()=>`Tractional retinal detachment secondary to proliferative diabetic retinopathy, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Repair of complex retinal detachment with pars plana vitrectomy, membrane dissection, and endolaser photocoagulation`,
+    allow:["chandelier","ta","pvd","trim","shave","periph","trimbreak","lensectomy","segdel","retinectomy","drainretinotomy","pfo","fax","endolaser","acwash","pfoout","pi","tamponade","iviinject","subconj","positioning"],
+    on:["chandelier","ta","pvd","trim","segdel","shave","endolaser","fax"],
+    defOpts:{ endolaser:"prp", tamponade:"c3f8", positioning:"face", pvd:"induced" , shave:"breaks", corevit:"ap"} },
+
+  vh:{ label:"Vitreous hemorrhage", hint:"67036 · 67039 · 67040",
+    preDx:()=>`Non-clearing vitreous hemorrhage, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Pars plana vitrectomy`,
+    allow:["chandelier","ta","pvd","trim","shave","periph","segdel","endolaser","cryo","fax","acwash","tamponade","iviinject","subconj","positioning"],
+    on:["ta","pvd","trim","shave","periph","endolaser"],
+    defOpts:{ endolaser:"prp", tamponade:"bss", pvd:"induced" , shave:"nobreaks", corevit:"ap"} },
+
+  fragments:{ label:"Retained lens fragments", hint:"67036 · 66852",
+    preDx:()=>`Retained lens fragments in the vitreous cavity following cataract surgery, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Pars plana vitrectomy with removal of retained lens material`,
+    allow:["antvit","ta","pvd","trim","shave","periph","fragments","pfo","pfoout","fax","endolaser","acwash","tamponade","iviinject","subconj","positioning"],
+    on:["antvit","ta","pvd","trim","shave","periph","fragments","pfoout"],
+    defOpts:{ tamponade:"bss", pvd:"induced" , shave:"nobreaks"} },
+
+  endo:{ label:"Endophthalmitis — tap and inject", hint:"67015 · 67028", noVit:true,
+    preDx:()=>`Acute endophthalmitis, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Vitreous tap with intravitreal injection of antibiotics`,
+    allow:["tap","iviinject"], on:["tap","iviinject"], defOpts:{ iviinject:"abx" } },
+
+  biopsy:{ label:"Diagnostic vitreous biopsy", hint:"67036",
+    preDx:()=>`${F("predx2","vitritis of undetermined etiology")}, ${OU()}`,
+    postDx:()=>`Pending histopathologic and microbiologic analysis`,
+    proc:()=>`Pars plana vitrectomy with diagnostic vitreous biopsy`,
+    allow:["vitbiopsy","ta","pvd","trim","shave","periph","tamponade","iviinject","subconj"],
+    on:["vitbiopsy","pvd","trim"], defOpts:{ tamponade:"bss", pvd:"induced" , shave:"nobreaks"} },
+
+  oilout:{ label:"Silicone oil removal", hint:"67121",
+    preDx:()=>`Silicone oil tamponade with attached retina, ${OU()}`, postDx:()=>`Same`,
+    proc:()=>`Removal of silicone oil from the posterior segment`,
+    allow:["oilremoval","periph","shave","endolaser","fax","acwash","tamponade","subconj","positioning"],
+    on:["oilremoval","periph"], defOpts:{ tamponade:"bss" , shave:"nobreaks"} }
+};
+
+/* ===================== FINDINGS ===================== */
+function FINDINGS(){
+  const c = S.caseId;
+  const lead = CASES[c].noVit
+    ? `Indirect ophthalmoscopic examination was performed`
+    : `The fundus was examined`;
+
+  switch (c){
+    case "macular":
+      return `${lead}, confirming ${D("macfind","an epiretinal membrane over the macula with distortion of the surrounding retinal architecture")}. The peripheral retina was inspected and found to be ${D("periphfind","attached, with no retinal breaks identified")}.`;
+    case "rrd": case "ppvsb": case "sb": case "pneumatic":
+      return `${lead}, confirming a rhegmatogenous retinal detachment extending from ${F("detfrom","o'clock")} to ${F("detto","o'clock")}, with retinal break(s) identified at ${F("breakloc","clock hour(s)")}. The macula was ${F("maculastat","attached / detached")}.`;
+    case "trd":
+      return `${lead}, confirming ${D("trdfind","fibrovascular proliferation along the arcades with tractional elevation of the retina")}, ${F("macinvolve","involving / sparing")} the macula.`;
+    case "vh":
+      return `${lead}; the view of the fundus was obscured by ${D("vhfind","dense vitreous hemorrhage")}, and detailed examination was deferred until the media had been cleared.`;
+    case "fragments":
+      return `${lead}, confirming retained lens fragments within the vitreous cavity, with ${D("fragfind","an attached retina and no identified breaks")}.`;
+    case "endo":
+      return `${lead}; ${D("endofind","there was no view of the posterior pole through dense vitritis")}.`;
+    case "biopsy":
+      return `${lead}, revealing ${D("biopfind","vitreous cells and haze without retinal infiltrate")}.`;
+    case "oilout":
+      return `${lead}, confirming ${D("oilfind","an attached retina beneath the silicone oil")}.`;
+    default:
+      return `${lead}, revealing ${F("genfind","describe the appearance of the retina")}.`;
+  }
+}
+
+/* ===================== COMPLICATIONS ===================== */
+const COMPL = {
+  none:{ label:"None", header:()=>`None`, text:null },
+
+  brk:{ label:"Iatrogenic retinal break", header:()=>`Iatrogenic retinal break`,
+    text:()=>`An iatrogenic retinal break was identified at ${F("cbrkloc","clock hour")} during ${F("cbrkwhen","the step during which it occurred")}. It was treated with ${D("cbrkmgmt","confluent endolaser photocoagulation")}, and at the conclusion of the case the break was flat and fully surrounded by treatment.` },
+
+  lens:{ label:"Lens touch", header:()=>`Lens touch`,
+    text:()=>`A focal lens touch occurred during ${F("clenswhen","the step during which it occurred")}, producing a localized ${D("clensdesc","posterior subcapsular opacity")}. The remainder of the lens remained clear and no lens material entered the vitreous cavity.` },
+
+  pfo:{ label:"Subretinal perfluorocarbon", header:()=>`Retained subretinal perfluorocarbon`,
+    text:()=>`Perfluorocarbon was noted to have passed into the subretinal space at ${F("cpfoloc","location")}. ${D("cpfomgmt","It was aspirated through the existing retinotomy using a 41-gauge cannula, with no residual subretinal perfluorocarbon identified at the conclusion of the case")}.` },
+
+  gas:{ label:"Subretinal gas", header:()=>`Subretinal gas`,
+    text:()=>`Gas was noted to have entered the subretinal space at ${F("cgasloc","location")} during the fluid-air exchange. ${F("cgasmgmt","describe the management and the state of the retina at the conclusion")}.` },
+
+  sch:{ label:"Suprachoroidal hemorrhage", header:()=>`Suprachoroidal hemorrhage`,
+    text:()=>`A suprachoroidal hemorrhage was recognized during ${F("cschwhen","the step during which it occurred")}, evidenced by ${D("cschsign","a rapidly elevating choroidal mass with shallowing of the vitreous cavity")}. The infusion pressure was elevated, the instruments were withdrawn, and the sclerotomies were closed. ${F("cschmgmt","describe the subsequent management and the disposition of the case")}.` },
+
+  hem:{ label:"Intraoperative hemorrhage", header:()=>`Intraoperative hemorrhage`,
+    text:()=>`Intraoperative hemorrhage occurred from ${F("chemsrc","source")}. The infusion pressure was transiently elevated and ${D("chemmgmt","intraocular diathermy was applied")} until hemostasis was achieved, after which the media were cleared and the pressure was returned to baseline.` },
+
+  frag:{ label:"Dropped lens fragment", header:()=>`Posteriorly dislocated lens material`,
+    text:()=>`Lens material was noted to dislocate posteriorly during ${F("cfragwhen","the step during which it occurred")}. ${F("cfragmgmt","describe the management, including whether it was retrieved during this procedure or deferred")}.` },
+
+  other:{ label:"Other", header:()=>F("cothhdr","name the complication"),
+    text:()=>`${F("cothtext","describe the complication, how it was recognized, and how it was managed")}.` }
+};
+
+/* ===================== CPT ===================== */
+const CPT_TEXT = {
+  "67036":"Vitrectomy, mechanical, pars plana approach",
+  "67039":"Vitrectomy with focal endolaser photocoagulation",
+  "67040":"Vitrectomy with endolaser panretinal photocoagulation",
+  "67041":"Vitrectomy with removal of preretinal cellular membrane",
+  "67042":"Vitrectomy with removal of internal limiting membrane",
+  "67043":"Vitrectomy with subretinal surgery",
+  "67101":"Repair of retinal detachment, cryotherapy",
+  "67107":"Repair of retinal detachment, scleral buckling",
+  "67108":"Repair of retinal detachment with vitrectomy",
+  "67110":"Repair of retinal detachment, injection of air or gas",
+  "67113":"Repair of complex retinal detachment with vitrectomy",
+  "67121":"Removal of implanted material, posterior segment",
+  "66852":"Removal of lens material, pars plana approach",
+  "67015":"Aspiration or release of vitreous",
+  "67028":"Intravitreal injection of a pharmacologic agent"
+};
+
+function computeCPT(){
+  const c = S.caseId, on = S.mods, add = [], sup = [];
+
+  if (c === "macular"){
+    if (on.ilm || on.mhflap){ add.push("67042"); if (on.erm) sup.push(["67041","bundled into 67042"]); }
+    else if (on.erm) add.push("67041");
+    else add.push("67036");
+    if (on.subtpa) add.push("67043");
+  } else if (c === "rrd" || c === "ppvsb"){
+    if (on.retinectomy){ add.push("67113"); sup.push(["67108","superseded by 67113"]); }
+    else add.push("67108");
+    if (c === "ppvsb") sup.push(["67107","the buckle is included in the vitrectomy repair code"]);
+    if (on.endolaser) sup.push(["67039 / 67040","included in the detachment repair code"]);
+    if (on.lensectomy) add.push("66852");
+  } else if (c === "sb"){
+    add.push("67107"); if (on.cryo) sup.push(["67101","included in 67107"]);
+  } else if (c === "pneumatic"){
+    add.push("67110"); if (on.cryo) sup.push(["67101","included in 67110"]);
+  } else if (c === "trd"){
+    add.push("67113"); if (on.lensectomy) add.push("66852");
+  } else if (c === "vh"){
+    if (on.endolaser) add.push(S.opts.endolaser === "prp" ? "67040" : "67039");
+    else add.push("67036");
+  } else if (c === "fragments"){
+    add.push("67036","66852");
+  } else if (c === "endo"){
+    add.push("67015","67028");
+  } else if (c === "biopsy"){
+    add.push("67036");
+  } else if (c === "oilout"){
+    add.push("67121");
+    if (on.endolaser) sup.push(["67039 / 67040","separate reporting is generally not supported alongside oil removal"]);
+  }
+
+  if (on.iviinject && c !== "endo" && !add.includes("67028"))
+    sup.push(["67028","an injection at the close of a vitrectomy is generally not separately reported"]);
+
+  return { add:[...new Set(add)], sup };
+}
+
+/* ===================== ASSEMBLY ===================== */
+const ORD  = m => typeof m.order === "function" ? m.order() : m.order;
+const PARA = m => typeof m.para  === "function" ? m.para()  : m.para;
+
+function activeModules(){
+  return M.filter(m => S.mods[m.id] && (!m.when || m.when())).sort((a,b) => ORD(a) - ORD(b));
+}
+
+function buildParagraphs(){
+  const g = {};
+  activeModules().forEach(m => {
+    const t = (m.text() || "").trim();
+    if (t) (g[PARA(m)] = g[PARA(m)] || []).push(t);
+  });
+  const c = COMPL[S.compl];
+  if (c && c.text) g[6.5] = [c.text()];
+  return Object.keys(g).sort((a,b) => a - b).map(k => g[k].join(" "));
+}
+
+const INDICATION = () => `This ${F("age","age")}-year-old patient presented with ${F("indication","the presenting problem, relevant history, and prior treatment")}. The risks, benefits, and alternatives of surgery were discussed in detail and informed consent was obtained.`;
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function toHTML(str){
+  return str.replace(/\{\{([a-z0-9_]+)\|([^}|]+)(\|d)?\}\}/gi, (_, key, ph, sug) => {
+    const v = S.fills[key] || "";
+    const cls = "fill" + (v.trim() ? " done" : "") + (sug ? " sug" : "");
+    const tip = sug ? ` title="Press Enter to accept this wording"` : "";
+    return `<span class="${cls}" contenteditable="true" spellcheck="false" tabindex="0"${tip} `
+         + `data-key="${key}" data-ph="${esc(ph)}"${sug ? ' data-accept="1"' : ""}>${esc(v)}</span>`;
+  });
+}
+function toPlain(str){
+  return str.replace(/\{\{([a-z0-9_]+)\|([^}|]+)(\|d)?\}\}/gi, (_, key, ph) => {
+    const v = S.fills[key];
+    return (v && v.trim().length) ? v : `[${ph}]`;
+  });
+}
+
+function specimens(){
+  if (S.mods.tap) return "Vitreous aspirate for Gram stain, culture, and sensitivities";
+  if (S.mods.vitbiopsy) return `Undiluted and diluted vitreous for ${F("specsend","cytology / flow cytometry / culture")}`;
+  return "None";
+}
+
+function fmtDate(v){
+  if (!v) return F("dos","date of surgery");
+  const [y,m,d] = v.split("-").map(Number);
+  if (!y || !m || !d) return F("dos","date of surgery");
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return `${months[m-1]} ${d}, ${y}`;
+}
+
+function headerFields(){
+  const C = CASES[S.caseId];
+  const anes = { retrobulbar:"Monitored anesthesia care with retrobulbar block",
+                 peribulbar:"Monitored anesthesia care with peribulbar block",
+                 general:"General anesthesia",
+                 topical:"Topical with intracameral lidocaine" }[S.vars.anes];
+  return [
+    ["Date of surgery", fmtDate(S.vars.date)],
+    ["Pre-operative diagnosis", C.preDx()],
+    ["Post-operative diagnosis", C.postDx()],
+    ["Procedure", `${C.proc()}, ${EYE()} eye`],
+    ["Surgeon", S.vars.surgeon || F("surgeon","surgeon")],
+    ["Assistant", S.vars.assistant || "None"],
+    ["Anesthesia", anes],
+    ["Estimated blood loss", "Minimal"],
+    ["Specimens", specimens()],
+    ["Complications", (COMPL[S.compl] || COMPL.none).header()],
+    ["Disposition", "Recovery area, stable condition"]
+  ];
+}
+
+function countUnfilled(){
+  const keys = [];
+  const scan = s => { const re = /\{\{([a-z0-9_]+)\|/gi; let m; while ((m = re.exec(s))) keys.push(m[1]); };
+  headerFields().forEach(([,v]) => scan(v));
+  scan(INDICATION());
+  buildParagraphs().forEach(scan);
+  return [...new Set(keys)].filter(k => !(S.fills[k] && S.fills[k].trim().length)).length;
+}
+
+/* ===================== CONSOLE RENDER ===================== */
+function renderCases(){
+  const el = document.getElementById("cases");
+  if (!S.caseOpen){
+    const c = CASES[S.caseId];
+    el.innerHTML = `<button class="case on" data-case="${S.caseId}">${esc(c.label)}<span class="cpt">${esc(c.hint)}</span></button>
+      <button class="chip changecase" style="align-self:flex-start;margin-top:7px">Change case</button>`;
+    el.querySelector(".changecase").onclick = () => { S.caseOpen = true; renderCases(); };
+    el.querySelector("[data-case]").onclick = () => { S.caseOpen = true; renderCases(); };
+    return;
+  }
+  el.innerHTML = Object.entries(CASES).map(([id,c]) =>
+    `<button class="case${id === S.caseId ? " on" : ""}" data-case="${id}">${esc(c.label)}<span class="cpt">${esc(c.hint)}</span></button>`).join("");
+  el.querySelectorAll("[data-case]").forEach(b => b.onclick = () => {
+    selectCase(b.dataset.case);
+    S.caseOpen = false;
+    renderCases();
+    const target = document.getElementById("sec-details");
+    if (target && target.scrollIntoView) target.scrollIntoView({ behavior:"smooth", block:"start" });
+  });
+}
+
+function renderFields(){
+  const defs = [
+    ["eye","Eye",{right:"Right (OD)",left:"Left (OS)"}],
+    ["lens","Lens status",{phakic:"Phakic",pseudophakic:"Pseudophakic",aphakic:"Aphakic"}],
+    ["gauge","Gauge",{"23":"23-gauge","25":"25-gauge","27":"27-gauge"}],
+    ["anes","Anesthesia",{retrobulbar:"Retrobulbar",peribulbar:"Peribulbar",general:"General",topical:"Topical"}],
+    ["view","Viewing",{"wide-angle":"Wide-angle","contact":"Contact lens","both":"Both"}]
+  ];
+  const el = document.getElementById("fields");
+  el.innerHTML = `<div class="field wide"><label class="lbl" for="v_date">Date of surgery</label>
+       <input type="date" id="v_date" data-var="date" value="${esc(S.vars.date)}"></div>`
+    + defs.map(([k,label,opts]) =>
+      `<div class="field"><label class="lbl" for="v_${k}">${label}</label>
+       <select id="v_${k}" data-var="${k}">${Object.entries(opts).map(([v,t]) =>
+         `<option value="${v}"${S.vars[k]===v?" selected":""}>${t}</option>`).join("")}</select></div>`).join("")
+    + `<div class="field wide"><label class="lbl" for="v_surgeon">Surgeon</label>
+       <input type="text" id="v_surgeon" data-var="surgeon" placeholder="Name, MD" value="${esc(S.vars.surgeon)}"></div>`
+    + `<div class="field wide"><label class="lbl" for="v_assistant">Assistant</label>
+       <input type="text" id="v_assistant" data-var="assistant" placeholder="Leave blank for none" value="${esc(S.vars.assistant)}"></div>`;
+  el.querySelectorAll("[data-var]").forEach(inp => {
+    inp.addEventListener(inp.tagName === "SELECT" ? "change" : "input", () => {
+      S.vars[inp.dataset.var] = inp.value; renderPaper();
+    });
+  });
+}
+
+function lockedAllowed(m){
+  const C = CASES[S.caseId];
+  return C.noVit ? ["timeout","anes","prep","findings","finish"].includes(m.id) : true;
+}
+function modHTML(m){
+  const on = !!S.mods[m.id];
+  let h = `<label class="mod${m.locked ? " locked" : ""}">
+    <input type="checkbox" data-mod="${m.id}"${on ? " checked" : ""}${m.locked ? " disabled" : ""}>
+    <span>${esc(m.label)}</span></label>`;
+  if (on && m.opts)
+    h += `<div class="subopt">` + Object.entries(m.opts.choices).map(([v,t]) =>
+      `<button class="chip${(S.opts[m.id]||"") === v ? " on" : ""}" data-opt="${m.id}" data-val="${v}">${esc(t)}</button>`).join("") + `</div>`;
+  if (on && m.nums && !(m.id === "endolaser" && S.opts.endolaser !== "prp"))
+    h += `<div class="subnum"><span>${esc(m.nums.label)}</span>
+      <input type="text" data-num="${m.id}" value="${esc(S.nums[m.id] ?? m.nums.def)}"></div>`;
+  return h;
+}
+
+function renderStages(){
+  const C = CASES[S.caseId];
+  const list = M.filter(m => (m.locked ? lockedAllowed(m) : C.allow.includes(m.id)) && (!m.when || m.when()))
+                .sort((a,b) => ORD(a) - ORD(b));
+  const stages = [];
+  list.forEach(m => {
+    let s = stages.find(x => x.name === m.stage);
+    if (!s) stages.push(s = { name:m.stage, items:[] });
+    s.items.push(m);
+  });
+  const root = document.getElementById("stages");
+  root.innerHTML = stages.map(s => `<div class="stage"><h3>${esc(s.name)}</h3>${s.items.map(modHTML).join("")}</div>`).join("");
+  root.querySelectorAll("input[data-mod]").forEach(cb =>
+    cb.onchange = () => { S.mods[cb.dataset.mod] = cb.checked; renderStages(); renderPaper(); });
+  root.querySelectorAll("[data-opt]").forEach(b =>
+    b.onclick = () => { S.opts[b.dataset.opt] = b.dataset.val; renderStages(); renderPaper(); });
+  root.querySelectorAll("[data-num]").forEach(i =>
+    i.oninput = () => { S.nums[i.dataset.num] = i.value; renderPaper(); });
+}
+
+function renderCompl(){
+  document.getElementById("complchips").innerHTML = Object.entries(COMPL).map(([v,c]) =>
+    `<button class="chip${S.compl === v ? " on" : ""}" data-compl="${v}">${esc(c.label)}</button>`).join("");
+  document.getElementById("complnote").innerHTML = S.compl === "none" ? ""
+    : `<p style="font-size:12px;color:var(--amber-lt);margin:11px 0 0;line-height:1.5">A paragraph has been added before the closure. Fill every highlighted field in it — the wording is a scaffold, not a record of what happened.</p>`;
+  document.querySelectorAll("[data-compl]").forEach(b =>
+    b.onclick = () => { S.compl = b.dataset.compl; renderCompl(); renderPaper(); });
+}
+
+/* ===================== PAPER RENDER ===================== */
+function renderPaper(){
+  const { add, sup } = computeCPT();
+
+  document.getElementById("hdr").innerHTML = headerFields().map(([k,v],i) => {
+    let val = toHTML(v);
+    if (k === "Procedure"){
+      val += `<div class="cptline">${esc(add.join("  ·  "))}</div>`
+        + `<div class="cptnote">${add.map(c => esc(CPT_TEXT[c] || c)).join("; ")}.`
+        + (sup.length ? " " + sup.map(([c,why]) => `<s>${esc(c)}</s> — ${esc(why)}`).join("; ") + "." : "")
+        + ` Verify against current coding guidance before submission.</div>`;
+    }
+    const f = i === 0 ? " first" : "";
+    return `<dt class="${f.trim()}">${esc(k)}</dt><dd class="${f.trim()}">${val}</dd>`;
+  }).join("");
+
+  document.getElementById("body").innerHTML =
+    `<p class="sechead">Indication</p><p>${toHTML(INDICATION())}</p>`
+    + `<p class="sechead">Description of procedure</p>`
+    + buildParagraphs().map(p => `<p>${toHTML(p)}</p>`).join("");
+
+  const n = countUnfilled();
+  document.getElementById("status").innerHTML = n
+    ? `<b>${n} field${n === 1 ? "" : "s"}</b> to fill — click and type. Blue fields already hold suggested wording; press Enter to keep it.`
+    : `Every field is filled. Read it once before you sign it.`;
+
+  document.getElementById("foot").textContent =
+    "Draft only. This assembles standard phrasing from the steps you selected; it does not know what happened in your case. Verify every statement, measurement, and code against your own recollection and the operative record before signing.";
+
+  bindFills();
+}
+
+function updateStatus(){
+  const n = countUnfilled();
+  document.getElementById("status").innerHTML = n
+    ? `<b>${n} field${n === 1 ? "" : "s"}</b> to fill — click and type. Blue fields already hold suggested wording; press Enter to keep it.`
+    : `Every field is filled. Read it once before you sign it.`;
+}
+
+function bindFills(){
+  document.querySelectorAll("span.fill").forEach(sp => {
+    sp.addEventListener("focus", () => {
+      const bar = document.querySelector(".paperbar");
+      const r = sp.getBoundingClientRect();
+      const top = (bar ? bar.getBoundingClientRect().bottom : 0) + 24;
+      const bottom = (window.innerHeight || 800) - 40;
+      if (r.top < top || r.bottom > bottom)
+        sp.scrollIntoView({ behavior:"smooth", block:"center" });
+    });
+    sp.addEventListener("input", () => {
+      if (!sp.textContent.trim()) sp.innerHTML = "";
+      const key = sp.dataset.key, val = sp.textContent, done = val.trim().length > 0;
+      S.fills[key] = val;
+      sp.classList.toggle("done", done);
+      document.querySelectorAll('span.fill[data-key="' + key + '"]').forEach(o => {
+        if (o !== sp){
+          if (done) o.textContent = val; else o.innerHTML = "";
+          o.classList.toggle("done", done);
+        }
+      });
+      updateStatus();
+    });
+    sp.addEventListener("keydown", e => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (sp.dataset.accept && !sp.textContent.trim()){
+        const val = sp.dataset.ph;
+        sp.textContent = val;
+        S.fills[sp.dataset.key] = val;
+        sp.classList.add("done");
+        document.querySelectorAll('span.fill[data-key="' + sp.dataset.key + '"]').forEach(o => {
+          if (o !== sp){ o.textContent = val; o.classList.add("done"); }
+        });
+        updateStatus();
+      }
+      sp.blur();
+    });
+    sp.addEventListener("paste", e => {
+      e.preventDefault();
+      const t = ((e.clipboardData || window.clipboardData).getData("text") || "").replace(/\s+/g, " ");
+      document.execCommand("insertText", false, t);
+    });
+  });
+}
+
+/* ===================== ACTIONS ===================== */
+function selectCase(id){
+  S.caseId = id;
+  const C = CASES[id];
+  S.mods = {};
+  M.filter(m => m.locked && lockedAllowed(m)).forEach(m => S.mods[m.id] = true);
+  C.on.forEach(x => S.mods[x] = true);
+  S.opts = Object.assign({}, C.defOpts || {});
+  S.nums = {};
+  renderCases(); renderStages(); renderCompl(); renderPaper();
+}
+
+function plainNote(){
+  const out = ["OPERATIVE REPORT",""];
+  headerFields().forEach(([k,v]) => out.push(`${k.toUpperCase()}: ${toPlain(v)}`));
+  out.push(`CPT (verify): ${computeCPT().add.join(", ")}`);
+  out.push("", "INDICATION", toPlain(INDICATION()), "", "DESCRIPTION OF PROCEDURE");
+  buildParagraphs().forEach(p => { out.push(toPlain(p), ""); });
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+document.getElementById("copyBtn").onclick = async () => {
+  const txt = plainNote();
+  try { await navigator.clipboard.writeText(txt); toast("Note copied — paste into the chart"); }
+  catch {
+    const ta = document.createElement("textarea");
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); toast("Note copied — paste into the chart"); }
+    catch { toast("Copy blocked by the browser — select the text manually"); }
+    ta.remove();
+  }
+};
+
+document.getElementById("resetBtn").onclick = () => {
+  S.fills = {}; S.compl = "none";
+  S.vars = { date:"", eye:"right", lens:"pseudophakic", gauge:"25", anes:"retrobulbar", view:"wide-angle", surgeon:"", assistant:"" };
+  renderFields(); selectCase(S.caseId); toast("Cleared");
+};
+
+renderFields();
+selectCase("macular");
+</script>
+</body>
+</html>
